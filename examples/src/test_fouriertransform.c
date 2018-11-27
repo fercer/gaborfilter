@@ -22,9 +22,10 @@ int main(int argc, char * argv[])
     
     char magic_number[3];
     fgets(magic_number, 3, fp_img);
-    if (strcmp(magic_number, "P5"))
+    
+    if (strcmp(magic_number, "P5") && strcmp(magic_number, "P2"))
     {
-        printf("<<Error: The input file is not of the required format, its format is: \"%s\" instead of \"P5\">>\n", magic_number);
+        printf("<<Error: The input file is not of the required format, its format is: \"%s\" instead of \"P5/P2\">>\n", magic_number);
         fclose(fp_img);
         return -1;
     }
@@ -52,32 +53,47 @@ int main(int argc, char * argv[])
     printf("The image has dimension: %ix%i pixels, with maximum value of: %i\n", height, width, max_value);
     
     int read_value;
-    long double * img = (long double*) malloc(height * width * sizeof(long double));
-    fftwl_complex* fimg = (fftwl_complex*) fftwl_malloc(height * (width/2 + 1) * sizeof(fftwl_complex));
-    long double * ifimg = (long double*) malloc(height * width * sizeof(long double));
-
-    for (unsigned int x = 0; x < width; x++)
+    double * img = (double*) malloc(height * width * sizeof(double));
+    fftw_complex* fimg = (fftw_complex*) fftw_malloc(height * (width/2 + 1) * sizeof(fftw_complex));
+    double * ifimg = (double*) malloc(height * width * sizeof(double));
+    
+    if (magic_number[1] == '2')
     {
+        printf("Reading the image from an ascii file\n");
         for (unsigned int y = 0; y < height; y++)
         {
-            read_value = fgetc(fp_img);
-            *(img + y*width + x) = 1.0 - (long double)read_value / 255.0;
+            for (unsigned int x = 0; x < width; x++)
+            {
+                fscanf(fp_img, "%i", &read_value);
+                *(img + y*width + x) = 1.0 - (double)read_value / 255.0;
+            }
         }
     }
-    
+    else
+    {
+        printf("Reading the image from a raw file\n");
+        for (unsigned int y = 0; y < height; y++)
+        {
+            for (unsigned int x = 0; x < width; x++)
+            {
+                read_value = fgetc(fp_img);
+                *(img + y*width + x) = 1.0 - (double)read_value / 255.0;
+            }
+        }
+    }
     fclose(fp_img);
 
     printf("Image loaded ...\n");
     
-    fftwl_plan forward_plan;
+    fftw_plan forward_plan;
 	
     /* Initialize the function: */
     printf("Preparing to perform the Fourier transform ...\n");
-    forward_plan = fftwl_plan_dft_r2c_2d(height, width, img, fimg, FFTW_ESTIMATE);
+    forward_plan = fftw_plan_dft_r2c_2d(height, width, img, fimg, FFTW_ESTIMATE);
     printf("Ready to perform the Fourier transform ...\n");
-    fftwl_execute(forward_plan);
+    fftw_execute(forward_plan);
     printf("Fourier transform applied successfully ...\n");
-    fftwl_destroy_plan(forward_plan);
+    fftw_destroy_plan(forward_plan);
     
     free(img);
     
@@ -106,25 +122,21 @@ int main(int argc, char * argv[])
     
     fclose(fp_img);
 
-    fftwl_plan backward_plan;
+    fftw_plan backward_plan;
     /* Initialize the function: */
     printf("Preparing to perform the inverse Fourier transform ...\n");
-    backward_plan = fftwl_plan_dft_c2r_2d(height, width, fimg, ifimg, FFTW_ESTIMATE);
+    backward_plan = fftw_plan_dft_c2r_2d(height, width, fimg, ifimg, FFTW_ESTIMATE);
     printf("Ready to perform the inverse Fourier transform ...\n");
-    fftwl_execute(backward_plan);
+    fftw_execute(backward_plan);
     printf("Inverse Fourier transform applied successfully ...\n");
 
-    fftwl_free(fimg);
+    fftw_free(fimg);
     
     fp_img = fopen("ift.bin", "wb");
     
     fwrite(&height, sizeof(int), 1, fp_img);
     fwrite(&width, sizeof(int), 1, fp_img);
-    for (unsigned int xy; xy < height*width; xy++)
-    {
-        real_part = (double) *(ifimg+xy);
-        fwrite(&real_part, sizeof(double), 1, fp_img);
-    }
+    fwrite(ifimg, sizeof(double), height*width, fp_img);
     
     fclose(fp_img);
     

@@ -18,7 +18,7 @@ None
 
 void generateGaborKernels(ft_complex** gabor_kernels, const unsigned int height, const unsigned int width, const unsigned int par_T, const double par_L, const unsigned int par_K)
 {
-	const double sx_2 = ((double)par_T / (2.0 * sqrt(2.0 * log(2.0)))) * ((double)par_T / (2.0 * sqrt(2.0 * log(2.0))));
+	const double sx_2 = (double)(par_T * par_T) / (8.0 * log(2.0));
 	const double sy_2 = par_L * par_L * sx_2;
 	const double fx = 1.0 / (double)par_T;
 	const double fx_2 = fx * fx;
@@ -28,28 +28,81 @@ void generateGaborKernels(ft_complex** gabor_kernels, const unsigned int height,
 
 	printf("Sx^2 = %f, Sy^2 = %f\n", sx_2, sy_2);
 
+#ifndef NDEBUG
+	FILE * gabor_kernels_fp = fopen("gabor_kernels.bin", "wb");	
+	fwrite(&par_T, sizeof(unsigned int), 1, gabor_kernels_fp);
+	fwrite(&par_L, sizeof(double), 1, gabor_kernels_fp);
+	fwrite(&par_K, sizeof(unsigned int), 1, gabor_kernels_fp);
+	fwrite(&height, sizeof(unsigned int), 1, gabor_kernels_fp);
+	fwrite(&width, sizeof(unsigned int), 1, gabor_kernels_fp);
+#endif
+
 	for (unsigned int k = 0; k < par_K; k++)
 	{		
-		const double ctheta = cos((double)k * (double)par_K / 180.0 * MY_PI);
-		const double stheta = sin((double)k * (double)par_K / 180.0 * MY_PI);
-
-		for (unsigned int y = 0; y < height; y++)
+		const double ctheta = cos((double)k / (double)par_K * MY_PI);
+		const double stheta = sin((double)k / (double)par_K * MY_PI);
+		
+		for (unsigned int y = height/2; y < height; y++)
 		{
-			const double v = 2.0*MY_PI*(double)y/(double)height - MY_PI;
-			for (unsigned int x = 0; x < (width/2 + 1); x++)
+			const double v = MY_PI*(2.0*(double)y/(double)height - 1.0);
 			{
-				const double u = 2.0*MY_PI*(double)x/(double)width - MY_PI;
+				const double u = -MY_PI;
 
 				const double rotated_u = u*ctheta + v*stheta;
 				const double rotated_v = -u*stheta + v*ctheta;
 
 				// Use only the real part of the kernel:
-				ft_real(*(gabor_kernels + k) + y*(width/2 + 1) + x) = exp(-0.5 * ((sx_2*rotated_u*rotated_u + 4.0*pi_2*fx_2) + (sy_2*rotated_v*rotated_v + 4.0*pi_2*fy_2))) * cosh(2.0*MY_PI*(sx_2*fx*rotated_u + sy_2*fy*rotated_v));
-				ft_imag(*(gabor_kernels + k) + y*(width/2 + 1) + x) = 0.0;
+				ft_real(*(gabor_kernels + k) + (y - height/2)*(width/2 + 1) + width/2) = exp(-(sx_2*(rotated_u*rotated_u + 4.0*pi_2*fx_2) + sy_2*(rotated_v*rotated_v + 4.0*pi_2*fy_2))/2.0) * cosh(2.0*MY_PI*(sx_2*fx*rotated_u + sy_2*fy*rotated_v));
+				ft_imag(*(gabor_kernels + k) + (y - height/2)*(width/2 + 1) + width/2) = 0.0;
+			}
+			for (unsigned int x = width/2; x < width; x++)
+			{
+				const double u = MY_PI*(2.0*(double)x/(double)width - 1.0);
+
+				const double rotated_u = u*ctheta + v*stheta;
+				const double rotated_v = -u*stheta + v*ctheta;
+
+				// Use only the real part of the kernel:
+				ft_real(*(gabor_kernels + k) + (y - height/2)*(width/2 + 1) + x - width/2) = exp(-(sx_2*(rotated_u*rotated_u + 4.0*pi_2*fx_2) + sy_2*(rotated_v*rotated_v + 4.0*pi_2*fy_2))/2.0) * cosh(2.0*MY_PI*(sx_2*fx*rotated_u + sy_2*fy*rotated_v));
+				ft_imag(*(gabor_kernels + k) + (y - height/2)*(width/2 + 1) + x - width/2) = 0.0;
 			}
 		}
+		
+		for (unsigned int y = 0; y < height/2; y++)
+		{
+			const double v = MY_PI*(2.0*(double)y/(double)height - 1.0);
+			{
+				const double u = -MY_PI;
+
+				const double rotated_u = u*ctheta + v*stheta;
+				const double rotated_v = -u*stheta + v*ctheta;
+
+				// Use only the real part of the kernel:
+				ft_real(*(gabor_kernels + k) + (y + height/2)*(width/2 + 1) + width/2) = exp(-(sx_2*(rotated_u*rotated_u + 4.0*pi_2*fx_2) + sy_2*(rotated_v*rotated_v + 4.0*pi_2*fy_2))/2.0) * cosh(2.0*MY_PI*(sx_2*fx*rotated_u + sy_2*fy*rotated_v));
+				ft_imag(*(gabor_kernels + k) + (y + height/2)*(width/2 + 1) + width/2) = 0.0;
+			}
+			for (unsigned int x = width/2; x < width; x++)
+			{
+				const double u = MY_PI*(2.0*(double)x/(double)width - 1.0);
+
+				const double rotated_u = u*ctheta + v*stheta;
+				const double rotated_v = -u*stheta + v*ctheta;
+
+				// Use only the real part of the kernel:
+				ft_real(*(gabor_kernels + k) + (y + height/2)*(width/2 + 1) + x - width/2) = exp(-(sx_2*(rotated_u*rotated_u + 4.0*pi_2*fx_2) + sy_2*(rotated_v*rotated_v + 4.0*pi_2*fy_2))/2.0) * cosh(2.0*MY_PI*(sx_2*fx*rotated_u + sy_2*fy*rotated_v));
+				ft_imag(*(gabor_kernels + k) + (y + height/2)*(width/2 + 1) + x - width/2) = 0.0;
+			}
+		}
+		
+#ifndef NDEBUG
+		fwrite(*(gabor_kernels+k), sizeof(ft_complex), height*(width/2 + 1), gabor_kernels_fp);
+#endif
 	}
 	
+#ifndef NDEBUG
+	 fclose(gabor_kernels_fp);
+#endif
+
 	DEBMSG("Gabor filters generated successfully...\n");
 }
 
@@ -59,24 +112,54 @@ void generateHPF(ft_complex* high_pass_filter, const unsigned int height, const 
 {	
 	const double sx_2 = ((double)par_T / (2.0 * sqrt(2.0 * log(2.0)))) * ((double)par_T / (2.0 * sqrt(2.0 * log(2.0))));
 	const double sy_2 = par_L * par_L * sx_2;
-	
-	for (unsigned int y = 0; y < height; y++)
+
+	for (unsigned int y = height/2; y < height; y++)
 	{
 		const double v = 2.0*MY_PI*(double)y/(double)height - MY_PI;
-		for (unsigned int x = 0; x < (width/2 + 1); x++)
+		{
+			const double u = -MY_PI;
+			ft_real(high_pass_filter + (y - height/2)*(width/2 + 1) + width/2) = 1.0 - exp(-(sy_2*(u*u + v*v))/2.0);
+			ft_imag(high_pass_filter + (y - height/2)*(width/2 + 1) + width/2) = 0.0;
+		}
+		for (unsigned int x = width/2; x < width; x++)
 		{
 			const double u = 2.0*MY_PI*(double)x/(double)width - MY_PI;
-			ft_real(high_pass_filter + y*(width/2 + 1) + x) = 1.0 - exp(-(1/2)*(sy_2*(u*u + v*v)));
-			ft_imag(high_pass_filter + y*(width/2 + 1) + x) = 0.0;
+			ft_real(high_pass_filter + (y - height/2)*(width/2 + 1) + x - width/2) = 1.0 - exp(-(sy_2*(u*u + v*v))/2.0);
+			ft_imag(high_pass_filter + (y - height/2)*(width/2 + 1) + x - width/2) = 0.0;
 		}
 	}
 	
+	for (unsigned int y = 0; y < height/2; y++)
+	{
+		const double v = 2.0*MY_PI*(double)y/(double)height - MY_PI;
+		{
+			const double u = -MY_PI;
+			ft_real(high_pass_filter + (y + height/2)*(width/2 + 1) + width/2) = 1.0 - exp(-(sy_2*(u*u + v*v))/2.0);
+			ft_imag(high_pass_filter + (y + height/2)*(width/2 + 1) + width/2) = 0.0;
+		}
+		for (unsigned int x = width/2; x < width; x++)
+		{
+			const double u = 2.0*MY_PI*(double)x/(double)width - MY_PI;
+			ft_real(high_pass_filter + (y + height/2)*(width/2 + 1) + x - width/2) = 1.0 - exp(-(sy_2*(u*u + v*v))/2.0);
+			ft_imag(high_pass_filter + (y + height/2)*(width/2 + 1) + x - width/2) = 0.0;
+		}
+	}
+	
+#ifndef NDEBUG
+	FILE * hpf_fp = fopen("hp_filter.bin", "wb");	
+	fwrite(&par_T, sizeof(unsigned int), 1, hpf_fp);
+	fwrite(&par_L, sizeof(double), 1, hpf_fp);
+	fwrite(&height, sizeof(unsigned int), 1, hpf_fp);
+	fwrite(&width, sizeof(unsigned int), 1, hpf_fp);
+	fwrite(high_pass_filter, sizeof(ft_complex), height*(width/2+1), hpf_fp);
+	fclose(hpf_fp);
+#endif
 	DEBMSG("High pass filter generated successfully...\n");
 }
 
 
 
-void gaborFilter(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, doublecomplex** gabor_kernels, doublecomplex* high_pass_filter)
+void gaborFilter(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter)
 {
 	ft_variables(height, width);
 	
@@ -90,8 +173,7 @@ void gaborFilter(ft_complex* input, double* output, const unsigned int height, c
 		ft_complex* i_ptr = input;
 		fr_ptr = fourier_response_to_kernel;
 		ft_complex* gk_ptr = *(gabor_kernels + k);
-		
-		
+
 		for (unsigned int xy = 0; xy < height*(width/2+1); xy++, i_ptr++, hpf_ptr++, fr_ptr++, gk_ptr++)
 		{
 			const double hpf_i_r = ft_real(hpf_ptr) * ft_real(i_ptr) - ft_imag(hpf_ptr) * ft_imag(i_ptr);
@@ -104,9 +186,25 @@ void gaborFilter(ft_complex* input, double* output, const unsigned int height, c
 		*(gabor_responses_to_kernels + k) = (double*) malloc(height * width * sizeof(double));
 
 		ft_backward_setup(height, width, fourier_response_to_kernel, *(gabor_responses_to_kernels + k));
-		ft_backward(height, width, fourier_response_to_kernel, *(gabor_responses_to_kernels + k));
-		
+		ft_backward(height, width, fourier_response_to_kernel, *(gabor_responses_to_kernels + k));		
 		ft_release_backward;
+		
+#ifndef NDEBUG
+		char * resp2kernel_filename = "resp2kernel_XXX.bin";
+		sprintf(resp2kernel_filename, "resp2kernel_%03i.bin", k);
+		
+		printf("%s\n", resp2kernel_filename);
+		
+		FILE * resp2kernel_fp = fopen(resp2kernel_filename, "wb");
+		
+		fwrite(&height, sizeof(int), 1, resp2kernel_fp);
+		fwrite(&width, sizeof(int), 1, resp2kernel_fp);
+		fwrite(&par_K, sizeof(int), 1, resp2kernel_fp);
+		fwrite(&k, sizeof(int), 1, resp2kernel_fp);
+		fwrite(*(gabor_responses_to_kernels + k), sizeof(double), height*width, resp2kernel_fp);
+		
+		fclose(resp2kernel_fp);
+#endif
 	}
 	ft_close;
 	deallocate_ft_complex(fourier_response_to_kernel);
@@ -123,7 +221,7 @@ void gaborFilter(ft_complex* input, double* output, const unsigned int height, c
 		
 		for (unsigned int xy = 0; xy < height*width; xy++, o_ptr++, gr_ptr++)
 		{
-			if (*o_ptr > *gr_ptr)
+			if (*o_ptr < *gr_ptr)
 			{
 				*o_ptr = *gr_ptr;
 			}
@@ -138,6 +236,7 @@ void gaborFilter(ft_complex* input, double* output, const unsigned int height, c
 
 void singleScaleGaborFilter(double * raw_input, char * mask, double * output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K)
 {
+	DEBMSG("Hello there\n");
 	ft_variables(height, width);
 
 	ft_complex* input = allocate_ft_complex(height * (width/2 + 1));
@@ -161,6 +260,8 @@ void singleScaleGaborFilter(double * raw_input, char * mask, double * output, co
 	generateHPF(high_pass_filter, height, width, par_T, par_L);
 
 	// Apply the single-scale filter:
+	DEBNUMMSG("Backward was used? %i", (int)backward_plan_active);
+	printf("Hello\n");
 	gaborFilter(input, output, height, width, par_K, gabor_kernels, high_pass_filter);
 
 	// Apply the mask, the mask(x, y) must be {0, 1}:
@@ -181,6 +282,7 @@ void singleScaleGaborFilter(double * raw_input, char * mask, double * output, co
 	deallocate_ft_complex(gabor_kernels);
 	deallocate_ft_complex(high_pass_filter);
 	deallocate_ft_complex(input);
+	
 	ft_close;
 }
 

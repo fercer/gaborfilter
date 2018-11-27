@@ -16,7 +16,7 @@ int main(int argc, char * argv[])
  
     int par_K = 45;
     double par_L = 2.65;
-    int par_T = 3;
+    int par_T = 13;
  
     FILE * fp_img = fopen(argv[1], "r");
     if (!fp_img)
@@ -27,9 +27,9 @@ int main(int argc, char * argv[])
     
     char magic_number[3];
     fgets(magic_number, 3, fp_img);
-    if (strcmp(magic_number, "P5"))
+    if (strcmp(magic_number, "P5") && strcmp(magic_number, "P2"))
     {
-        printf("<<Error: The input file is not of the required format, its format is: \"%s\" instead of \"P5\">>\n", magic_number);
+        printf("<<Error: The input file is not of the required format, its format is: \"%s\" instead of \"P5/P2\">>\n", magic_number);
         fclose(fp_img);
         return -1;
     }
@@ -61,16 +61,30 @@ int main(int argc, char * argv[])
     double * img = (double*) malloc(height * width * sizeof(double));
     double * resp = (double*) malloc(height * width * sizeof(double));
 
-    for (unsigned int xy = 0; xy < height*width; xy++)
+    if (magic_number[1] == '2')
     {
-        read_value = fgetc(fp_img);
-        *(img + xy) = 1.0 - (double)read_value / 255.0;
-        *(mask + xy) = (char)1;
+        printf("Reading the image from an ascii file\n");
+        for (unsigned int xy = 0; xy < height*width; xy++)
+        {
+            fscanf(fp_img, "%i", &read_value);
+            *(img + xy) = 1.0 - (double)read_value / 255.0;
+            *(mask+xy) = (char)1;
+        }
+    }
+    else
+    {
+        printf("Reading the image from a raw file\n");
+        for (unsigned int xy = 0; xy < height*width; xy++)
+        {
+            read_value = fgetc(fp_img);
+            *(img + xy) = 1.0 - (double)read_value / 255.0;
+            *(mask+xy) = (char)1;
+        }
     }
     
     fclose(fp_img);
 
-    printf("Image loaded ...\n");
+    printf("Image loaded (first, middle and last values are: %.16f, %.16f, %.16f)...\n", *img, *(img+(150-1)*300+150-1), *(img + height*width-1));
 
     singleScaleGaborFilter(img, mask, resp, height, width, par_T, par_L, par_K);
 

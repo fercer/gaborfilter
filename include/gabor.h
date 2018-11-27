@@ -44,22 +44,22 @@ None
 #define ft_release_backward 
 #define ft_close free(communication_work_array)
 #else
-#include <fftw.h>
+#include <fftw3.h>
 #define ft_complex fftw_complex
-#define ft_real(POINTER) *(POINTER)
-#define ft_imag(POINTER) *(POINTER + 1)
+#define ft_real(POINTER) *(*(POINTER))
+#define ft_imag(POINTER) *(*(POINTER) + 1)
 #define allocate_ft_complex(ARRAY_SIZE) (fftw_complex*)fftw_malloc(ARRAY_SIZE*sizeof(fftw_complex))
 #define allocate_ft_complex_pointers(ARRAY_SIZE) (fftw_complex**)fftw_malloc(ARRAY_SIZE*sizeof(fftw_complex*))
 #define allocate_ft_complex_pointers_of_pointers(ARRAY_SIZE) (fftw_complex***)fftw_malloc(ARRAY_SIZE*sizeof(fftw_complex**))
 #define deallocate_ft_complex(COMPLEX_ARRAY) fftw_free(COMPLEX_ARRAY)
 #define ft_variables(HEIGHT, WIDTH) fftw_plan forward_plan, backward_plan; char forward_plan_active = 0, backward_plan_active = 0
-#define ft_forward_setup(HEIGHT, WIDTH, INPUT, OUTPUT) forward_plan = fftw_plan_dft_r2c_2d(HEIGHT, WIDTH, INPUT, OUTPUT,  FFTW_ESTIMATE)
-#define ft_backward_setup(HEIGHT, WIDTH, INPUT, OUTPUT) backward_plan = fftw_plan_dft_c2r_2d(HEIGHT, WIDTH, INPUT, OUTPUT, FFTW_ESTIMATE)
+#define ft_forward_setup(HEIGHT, WIDTH, INPUT, OUTPUT) forward_plan = fftw_plan_dft_r2c_2d(HEIGHT, WIDTH, INPUT, OUTPUT,  FFTW_ESTIMATE); forward_plan_active = 1
+#define ft_backward_setup(HEIGHT, WIDTH, INPUT, OUTPUT) backward_plan = fftw_plan_dft_c2r_2d(HEIGHT, WIDTH, INPUT, OUTPUT, FFTW_ESTIMATE); backward_plan_active = 1
 #define ft_forward(HEIGHT, WIDTH, INPUT, OUTPUT) fftw_execute(forward_plan)
-#define ft_backward(HEIGHT, WIDTH, INPUT, OUTPUT) fftw_execute(backward)
-#define ft_release_forward fftw_destroy_plan(forward_plan)
-#define ft_release_backward fftw_destroy_plan(backward_plan)
-#define ft_close() if (forward_plan_active) fftw_destroy_plan(forward_plan); if (backward_plan_active) fftw_destroy_plan(backward_plan)
+#define ft_backward(HEIGHT, WIDTH, INPUT, OUTPUT) fftw_execute(backward_plan)
+#define ft_release_forward fftw_destroy_plan(forward_plan); forward_plan_active = 0
+#define ft_release_backward fftw_destroy_plan(backward_plan); backward_plan_active = 0
+#define ft_close if (forward_plan_active){fftw_destroy_plan(forward_plan);} if (backward_plan_active){fftw_destroy_plan(backward_plan);}
 #endif
 
 #ifndef NDEBUG
