@@ -77,12 +77,15 @@ None
 
 #define MY_PI 3.1415926535897932384626433832795028841971693993751058209749445923078164
 
+#if defined(_WIN32) || defined(_WIN64)
 #ifdef BUILDING_GABOR_DLL
 #define GABOR_DLL __declspec(dllexport)
 #else
 #define GABOR_DLL __declspec(dllimport)
 #endif
-
+#else
+#define GABOR_DLL 
+#endif
 
 void generateGaborKernels(ft_complex** gabor_kernels, const unsigned int height, const unsigned int width, const unsigned int par_T, const double par_L, const unsigned int par_K);
 void generateHPF(ft_complex* high_pass_filter, const unsigned int height, const unsigned int width, const unsigned int par_T, const double par_L);
