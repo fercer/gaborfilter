@@ -26,17 +26,6 @@ void generateGaborKernels(ft_complex** gabor_kernels, const unsigned int height,
 	const double fy_2 = fy * fy;
 	const double pi_2 = MY_PI * MY_PI;
 
-	printf("Sx^2 = %f, Sy^2 = %f\n", sx_2, sy_2);
-
-#ifndef NDEBUG
-	FILE * gabor_kernels_fp = fopen("gabor_kernels.bin", "wb");	
-	fwrite(&par_T, sizeof(unsigned int), 1, gabor_kernels_fp);
-	fwrite(&par_L, sizeof(double), 1, gabor_kernels_fp);
-	fwrite(&par_K, sizeof(unsigned int), 1, gabor_kernels_fp);
-	fwrite(&height, sizeof(unsigned int), 1, gabor_kernels_fp);
-	fwrite(&width, sizeof(unsigned int), 1, gabor_kernels_fp);
-#endif
-
 	for (unsigned int k = 0; k < par_K; k++)
 	{		
 		const double ctheta = cos((double)k / (double)par_K * MY_PI);
@@ -93,17 +82,7 @@ void generateGaborKernels(ft_complex** gabor_kernels, const unsigned int height,
 				ft_imag(*(gabor_kernels + k) + (y + height/2)*(width/2 + 1) + x - width/2) = 0.0;
 			}
 		}
-		
-#ifndef NDEBUG
-		fwrite(*(gabor_kernels+k), sizeof(ft_complex), height*(width/2 + 1), gabor_kernels_fp);
-#endif
-	}
-	
-#ifndef NDEBUG
-	 fclose(gabor_kernels_fp);
-#endif
-
-	DEBMSG("Gabor filters generated successfully...\n");
+	}	
 }
 
 
@@ -144,22 +123,11 @@ void generateHPF(ft_complex* high_pass_filter, const unsigned int height, const 
 			ft_imag(high_pass_filter + (y + height/2)*(width/2 + 1) + x - width/2) = 0.0;
 		}
 	}
-	
-#ifndef NDEBUG
-	FILE * hpf_fp = fopen("hp_filter.bin", "wb");	
-	fwrite(&par_T, sizeof(unsigned int), 1, hpf_fp);
-	fwrite(&par_L, sizeof(double), 1, hpf_fp);
-	fwrite(&height, sizeof(unsigned int), 1, hpf_fp);
-	fwrite(&width, sizeof(unsigned int), 1, hpf_fp);
-	fwrite(high_pass_filter, sizeof(ft_complex), height*(width/2+1), hpf_fp);
-	fclose(hpf_fp);
-#endif
-	DEBMSG("High pass filter generated successfully...\n");
 }
 
 
 
-void gaborFilter(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter)
+void gaborFilter_impl(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter)
 {
 	ft_variables(height, width);
 	
@@ -176,8 +144,8 @@ void gaborFilter(ft_complex* input, double* output, const unsigned int height, c
 
 		for (unsigned int xy = 0; xy < height*(width/2+1); xy++, i_ptr++, hpf_ptr++, fr_ptr++, gk_ptr++)
 		{
-			const double hpf_i_r = ft_real(hpf_ptr) * ft_real(i_ptr) - ft_imag(hpf_ptr) * ft_imag(i_ptr);
-			const double hpf_i_i = ft_real(hpf_ptr) * ft_imag(i_ptr) + ft_imag(hpf_ptr) * ft_real(i_ptr);
+			const double hpf_i_r = ft_real(hpf_ptr) * ft_real(i_ptr) / (double)(height*width) - ft_imag(hpf_ptr) * ft_imag(i_ptr) / (double)(height*width);
+			const double hpf_i_i = ft_real(hpf_ptr) * ft_imag(i_ptr) / (double)(height*width) + ft_imag(hpf_ptr) * ft_real(i_ptr) / (double)(height*width);
 			
 			ft_real(fr_ptr) = hpf_i_r*ft_real(gk_ptr) - hpf_i_i*ft_imag(gk_ptr);
 			ft_imag(fr_ptr) = hpf_i_r*ft_imag(gk_ptr) + hpf_i_i*ft_real(gk_ptr);
@@ -188,28 +156,9 @@ void gaborFilter(ft_complex* input, double* output, const unsigned int height, c
 		ft_backward_setup(height, width, fourier_response_to_kernel, *(gabor_responses_to_kernels + k));
 		ft_backward(height, width, fourier_response_to_kernel, *(gabor_responses_to_kernels + k));		
 		ft_release_backward;
-		
-#ifndef NDEBUG
-		char * resp2kernel_filename = "resp2kernel_XXX.bin";
-		sprintf(resp2kernel_filename, "resp2kernel_%03i.bin", k);
-		
-		printf("%s\n", resp2kernel_filename);
-		
-		FILE * resp2kernel_fp = fopen(resp2kernel_filename, "wb");
-		
-		fwrite(&height, sizeof(int), 1, resp2kernel_fp);
-		fwrite(&width, sizeof(int), 1, resp2kernel_fp);
-		fwrite(&par_K, sizeof(int), 1, resp2kernel_fp);
-		fwrite(&k, sizeof(int), 1, resp2kernel_fp);
-		fwrite(*(gabor_responses_to_kernels + k), sizeof(double), height*width, resp2kernel_fp);
-		
-		fclose(resp2kernel_fp);
-#endif
 	}
 	ft_close;
 	deallocate_ft_complex(fourier_response_to_kernel);
-
-	DEBMSG("Gabor kernels applied successfully...\n");
 	
 	memcpy(output, *gabor_responses_to_kernels, height*width*sizeof(double));
 	free(*gabor_responses_to_kernels);
@@ -229,22 +178,18 @@ void gaborFilter(ft_complex* input, double* output, const unsigned int height, c
 		free(*(gabor_responses_to_kernels + k));
 	}	
 	free(gabor_responses_to_kernels);
-	DEBMSG("Gabor filter applied successfully...\n");
 }
 
 
 
 void singleScaleGaborFilter(double * raw_input, char * mask, double * output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K)
 {
-	DEBMSG("Hello there\n");
 	ft_variables(height, width);
 
 	ft_complex* input = allocate_ft_complex(height * (width/2 + 1));
 	/* Perform the Fourier Transform: */
 	ft_forward_setup(height, width, raw_input, input);
-	DEBMSG("Fourier transform setup ...\n");
 	ft_forward(height, width, raw_input, input);
-	DEBMSG("Raw input transformed with Fourier successfully...\n");
 	ft_release_forward;
 	
 	
@@ -260,19 +205,15 @@ void singleScaleGaborFilter(double * raw_input, char * mask, double * output, co
 	generateHPF(high_pass_filter, height, width, par_T, par_L);
 
 	// Apply the single-scale filter:
-	DEBNUMMSG("Backward was used? %i", (int)backward_plan_active);
-	printf("Hello\n");
-	gaborFilter(input, output, height, width, par_K, gabor_kernels, high_pass_filter);
+	gaborFilter_impl(input, output, height, width, par_K, gabor_kernels, high_pass_filter);
 
 	// Apply the mask, the mask(x, y) must be {0, 1}:
-	/*
 	char * m_ptr = mask;
 	double *o_ptr = output;
 	for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr++)
 	{
 		*o_ptr = *o_ptr * (double)*m_ptr;
 	}
-	*/
 	
 	// Free all memory used for image the filtering:
 	for (unsigned int k = 0; k < par_K; k++)
@@ -313,7 +254,7 @@ void singleScaleGaborFilter_multipleinputs(double * raw_input, const unsigned in
 		ft_release_forward;
 		
 		// Apply the single-scale filter:
-		gaborFilter(input, output + height*width*i, height, width, par_K, gabor_kernels, high_pass_filter);
+		gaborFilter_impl(input, output + height*width*i, height, width, par_K, gabor_kernels, high_pass_filter);
 
 		// Apply the mask, the mask(x, y) must be {0, 1}:
 		char * m_ptr = mask;
@@ -362,7 +303,7 @@ void multiscaleGaborFilter(double * raw_input, char * mask, double * output, con
 		generateHPF(high_pass_filter, height, width, *(par_T+t), par_L);
 
 		// Apply the single-scale filter:
-		gaborFilter(input, output + height*width*t, height, width, par_K, gabor_kernels, high_pass_filter);
+		gaborFilter_impl(input, output + height*width*t, height, width, par_K, gabor_kernels, high_pass_filter);
 
 		// Apply the mask, the mask(x, y) must be {0, 1}:
 		char * m_ptr = mask;
@@ -409,6 +350,8 @@ void multiscaleGaborFilter_multipleinputs(double * raw_input, const unsigned int
 		generateHPF(*(high_pass_filter+t), height, width, *(par_T+t), par_L);
 	}
 
+printf("Mask (150, 150): %f\n", (double)*(mask + 149 * 300 + 149));
+
 	for (unsigned int i = 0; i < n_inputs; i++)
 	{
 		/* Perform the Fourier Transform: */
@@ -419,7 +362,7 @@ void multiscaleGaborFilter_multipleinputs(double * raw_input, const unsigned int
 		for (unsigned int t = 0; t < t_scales; t++)
 		{
 			// Apply the single-scale filter:
-			gaborFilter(input, output + height*width*t, height, width, par_K, *(gabor_kernels+t), *(high_pass_filter+t));
+			gaborFilter_impl(input, output + height*width*t + height*width*t_scales*i, height, width, par_K, *(gabor_kernels+t), *(high_pass_filter+t));
 
 			// Apply the mask, the mask(x, y) must be {0, 1}:
 			char * m_ptr = mask + height*width*i;
@@ -448,41 +391,104 @@ void multiscaleGaborFilter_multipleinputs(double * raw_input, const unsigned int
 }
 
 
-/*
-npy_intp extracted_patches_dimensions[] = { sample_size, input_channels, patch_size, patch_size };
-PyObject * extracted_patches = PyArray_SimpleNew(4, &extracted_patches_dimensions[0], NPY_DOUBLE);
-char * extracted_patches_data = ((PyArrayObject*)extracted_patches)->data;
-npy_intp extracted_patches_stride = ((PyArrayObject*)extracted_patches)->strides[((PyArrayObject*)extracted_patches)->nd - 1];
 
-PyObject *patches_tuple = PyTuple_New(2);
-PyTuple_SetItem(patches_tuple, 0, extracted_patches);
-PyTuple_SetItem(patches_tuple, 1, max_values);
-*/
-/*
+#ifdef BUILDING_PYHTON_MODULE
 PyObject *gaborFilter(PyObject *self, PyObject *args)
 {
-	PyArrayObject *input;
-	unsigned int patch_size;
-	unsigned int stride;
-	double positive_proportion;
-	PyArrayObject *sampled_indices;
-
-	// Parse the input arguments to extract two numpy arrays:
-	if (!PyArg_ParseTuple(args, "O!IIdO!", &PyArray_Type, &input, &patch_size, &stride, &positive_proportion, &PyArray_Type, &sampled_indices))
+	PyArrayObject *raw_input;
+	char *raw_input_data = NULL;
+	npy_intp raw_input_stride, n_imgs = 1;
+	npy_intp height, width;
+	
+	PyArrayObject *multiscale_par_T = NULL;
+	char * par_T_data = NULL;
+	npy_intp par_T_stride, par_T_scales = 1;
+	
+	PyArrayObject *mask = NULL;
+	char * mask_data = NULL;
+	npy_intp mask_stride;
+	
+	double par_L;
+	unsigned int par_K;
+	
+	if (!PyArg_ParseTuple(args, "O!O!dIO!", &PyArray_Type, &raw_input, &PyArray_Type, &multiscale_par_T, &par_L, &par_K, &PyArray_Type, &mask))
 	{
 		return NULL;
 	}
+	
+	par_T_data = ((PyArrayObject*)multiscale_par_T)->data;
+	par_T_scales = ((PyArrayObject*)multiscale_par_T)->dimensions[0];
+	par_T_stride = ((PyArrayObject*)multiscale_par_T)->strides[((PyArrayObject*)multiscale_par_T)->nd-1];
 
-	return extractbalancedpatchesMax_impl(input, positive_proportion, patch_size, stride, sampled_indices);
+	if (((PyArrayObject*)raw_input)->nd > 2)
+	{
+		n_imgs = ((PyArrayObject*)raw_input)->dimensions[0];
+		height = ((PyArrayObject*)raw_input)->dimensions[1];
+		width = ((PyArrayObject*)raw_input)->dimensions[2];
+	}
+	else
+	{
+		n_imgs = 1;
+		height = ((PyArrayObject*)raw_input)->dimensions[0];
+		width = ((PyArrayObject*)raw_input)->dimensions[1];
+	}
+	
+	raw_input_data  = ((PyArrayObject*)raw_input)->data;
+	raw_input_stride = ((PyArrayObject*)raw_input)->strides[((PyArrayObject*)raw_input)->nd - 1];
+	
+	mask_data = ((PyArrayObject*)mask)->data;
+	mask_stride = ((PyArrayObject*)mask)->strides[((PyArrayObject*)mask)->nd - 1];
+
+	PyObject * gabor_response = NULL;
+	if (n_imgs > 1 && par_T_scales > 1)	
+	{
+		npy_intp gabor_response_shape[] = { n_imgs, par_T_scales, height, width };		
+		gabor_response = PyArray_SimpleNew(4, &gabor_response_shape[0], NPY_DOUBLE);
+	}
+	else if (n_imgs > 1 && par_T_scales == 1)
+	{
+		npy_intp gabor_response_shape[] = { n_imgs, height, width };		
+		gabor_response = PyArray_SimpleNew(3, &gabor_response_shape[0], NPY_DOUBLE);
+	}
+	else if (n_imgs == 1 && par_T_scales > 1)
+	{
+		npy_intp gabor_response_shape[] = { par_T_scales, height, width };		
+		gabor_response = PyArray_SimpleNew(3, &gabor_response_shape[0], NPY_DOUBLE);
+	}
+	else
+	{
+		npy_intp gabor_response_shape[] = { height, width };		
+		gabor_response = PyArray_SimpleNew(2, &gabor_response_shape[0], NPY_DOUBLE);
+	}
+	
+	char * gabor_response_data = ((PyArrayObject*)gabor_response)->data;
+	npy_intp gabor_response_stride = ((PyArrayObject*)gabor_response)->strides[((PyArrayObject*)gabor_response)->nd-1];
+	
+	if (n_imgs > 1)
+	{
+		DEBMSG("Multiscale gabor filtering over multiple images\n");
+		multiscaleGaborFilter_multipleinputs((double*)raw_input_data, (unsigned int)n_imgs, mask_data, (double*)gabor_response_data, (unsigned int)height, (unsigned int)width, (int*)par_T_data, (unsigned int)par_T_scales, (double)par_L, (unsigned int)par_K);
+	}
+	else
+	{
+		DEBMSG("Multiscale gabor filtering over a single image\n");
+		multiscaleGaborFilter((double*)raw_input_data, mask_data, (double*)gabor_response_data, (unsigned int)height, (unsigned int)width, (int*)par_T_data, (unsigned int)par_T_scales, (double)par_L, (unsigned int)par_K);
+	}
+	
+	return gabor_response;
 }
+#endif
 
 
+#ifdef BUILDING_PYHTON_MODULE
 static PyMethodDef gabor_methods[] = {
-	{ "gaborFilter",	gaborFilter, METH_VARARGS, "applies the Gabor filter to the input image, using the parameters t, l and K passed, if the parameter t is a list, then the multiscale Gabor filter is pplied instead." },
+	{ "gaborFilter", gaborFilter, METH_VARARGS, "applies the Gabor filter to the input image, using the parameters t, l and K passed, if the parameter t is a list, then the multiscale Gabor filter is pplied instead." },
 	{ NULL, NULL, 0, NULL }
 };
+#endif
 
 
+#ifdef BUILDING_PYHTON_MODULE
 static struct PyModuleDef gabor_moduledef = {
 	PyModuleDef_HEAD_INIT,
 	"gabor",
@@ -494,8 +500,10 @@ static struct PyModuleDef gabor_moduledef = {
 	NULL,
 	NULL
 };
+#endif
 
 
+#ifdef BUILDING_PYHTON_MODULE
 PyMODINIT_FUNC PyInit_gabor(void)
 {
 	PyObject *m;
@@ -507,4 +515,4 @@ PyMODINIT_FUNC PyInit_gabor(void)
 
 	return m;
 }
-*/
+#endif

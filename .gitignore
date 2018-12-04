@@ -36,6 +36,7 @@
 *.x86_64
 *.hex
 *.bin
+*.pyc
 
 # Debug files
 *.dSYM/
@@ -51,3 +52,9 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Images
+*.png
+*.pgm
+*.gif
+*.jpg

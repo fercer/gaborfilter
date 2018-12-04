@@ -18,11 +18,22 @@ None
 #ifndef GABOR_DLL_H_INCLUDED
 #define GABOR_DLL_H_INCLUDED
 
-#ifdef COMPILE_PYTHON
-#include <Python.h>
-#include <numpy/ndarraytypes.h>
-#include <numpy/ufuncobject.h>
-#include <numpy/npy_3kcompat.h>
+#ifdef BUILDING_PYHTON_MODULE
+    #include <Python.h>
+    #include <numpy/ndarraytypes.h>
+    #include <numpy/ufuncobject.h>
+    #include <numpy/npy_3kcompat.h>
+    #define GABOR_DLL 
+#else
+    #if defined(_WIN32) || defined(_WIN64)
+        #ifdef BUILDING_GABOR_DLL
+            #define GABOR_DLL __declspec(dllexport)
+        #else
+            #define GABOR_DLL __declspec(dllimport)
+        #endif
+    #else
+        #define GABOR_DLL 
+    #endif
 #endif
 
 
@@ -77,17 +88,10 @@ None
 
 #define MY_PI 3.1415926535897932384626433832795028841971693993751058209749445923078164
 
-#ifdef BUILDING_GABOR_DLL
-#define GABOR_DLL __declspec(dllexport)
-#else
-#define GABOR_DLL __declspec(dllimport)
-#endif
-
-
 void generateGaborKernels(ft_complex** gabor_kernels, const unsigned int height, const unsigned int width, const unsigned int par_T, const double par_L, const unsigned int par_K);
 void generateHPF(ft_complex* high_pass_filter, const unsigned int height, const unsigned int width, const unsigned int par_T, const double par_L);
 
-void gaborFilter(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter);
+void gaborFilter_impl(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter);
 
 void GABOR_DLL singleScaleGaborFilter(double * raw_input, char * mask, double * output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K);
 void GABOR_DLL singleScaleGaborFilter_multipleinputs(double * raw_input, const unsigned int n_inputs, char * mask, double * output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K);
@@ -95,7 +99,8 @@ void GABOR_DLL singleScaleGaborFilter_multipleinputs(double * raw_input, const u
 void GABOR_DLL multiscaleGaborFilter(double * raw_input, char * mask, double * output, const unsigned int height, const unsigned width, unsigned int * par_T, const unsigned int t_scales, const double par_L, const unsigned int par_K);
 void GABOR_DLL multiscaleGaborFilter_multipleinputs(double * raw_input, const unsigned int n_inputs, char * mask, double * output, const unsigned int height, const unsigned width, unsigned int * par_T, const unsigned int t_scales, const double par_L, const unsigned int par_K);
 
-//static PyObject* gaborFilter(PyObject *self, PyObject *args);
-
+#ifdef BUILDING_PYHTON_MODULE
+static PyObject* gaborFilter(PyObject *self, PyObject *args);
+#endif
 
 #endif // GABOR_DLL_H_INCLUDED
