@@ -18,7 +18,7 @@ None
 #ifndef GABOR_DLL_H_INCLUDED
 #define GABOR_DLL_H_INCLUDED
 
-#ifdef BUILDING_PYHTON_MODULE
+#ifdef BUILDING_PYTHON_MODULE
     #include <Python.h>
     #include <numpy/ndarraytypes.h>
     #include <numpy/ufuncobject.h>
@@ -92,6 +92,8 @@ void generateGaborKernels(ft_complex** gabor_kernels, const unsigned int height,
 void generateHPF(ft_complex* high_pass_filter, const unsigned int height, const unsigned int width, const unsigned int par_T, const double par_L);
 
 void gaborFilter_impl(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter);
+void gaborFilterWithAngles_impl(ft_complex* input, double* output, double * angles_output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter);
+
 
 void GABOR_DLL singleScaleGaborFilter(double * raw_input, char * mask, double * output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K);
 void GABOR_DLL singleScaleGaborFilter_multipleinputs(double * raw_input, const unsigned int n_inputs, char * mask, double * output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K);
@@ -99,8 +101,19 @@ void GABOR_DLL singleScaleGaborFilter_multipleinputs(double * raw_input, const u
 void GABOR_DLL multiscaleGaborFilter(double * raw_input, char * mask, double * output, const unsigned int height, const unsigned width, unsigned int * par_T, const unsigned int t_scales, const double par_L, const unsigned int par_K);
 void GABOR_DLL multiscaleGaborFilter_multipleinputs(double * raw_input, const unsigned int n_inputs, char * mask, double * output, const unsigned int height, const unsigned width, unsigned int * par_T, const unsigned int t_scales, const double par_L, const unsigned int par_K);
 
-#ifdef BUILDING_PYHTON_MODULE
+void GABOR_DLL singleScaleGaborFilterWithAngles(double * raw_input, char * mask, double * output, double * angles_output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K);
+void GABOR_DLL singleScaleGaborFilterWithAngles_multipleinputs(double * raw_input, const unsigned int n_inputs, char * mask, double * output, double * angles_output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K);
+
+void GABOR_DLL multiscaleGaborFilterWithAngles(double * raw_input, char * mask, double * output, double * angles_output, const unsigned int height, const unsigned width, unsigned int * par_T, const unsigned int t_scales, const double par_L, const unsigned int par_K);
+void GABOR_DLL multiscaleGaborFilterWithAngles_multipleinputs(double * raw_input, const unsigned int n_inputs, char * mask, double * output, double * angles_output, const unsigned int height, const unsigned width, unsigned int * par_T, const unsigned int t_scales, const double par_L, const unsigned int par_K);
+
+
+#ifdef BUILDING_PYTHON_MODULE
 static PyObject* gaborFilter(PyObject *self, PyObject *args);
+#endif
+
+#ifdef BUILDING_PYTHON_MODULE
+static PyObject* gaborFilterWithAngles(PyObject *self, PyObject *args);
 #endif
 
 #endif // GABOR_DLL_H_INCLUDED

@@ -1,23 +1,48 @@
 @echo off
-if "%1" == "dll" (
-setlocal
-#SET _REQUIRED_INCLUDE_PATHS=/ID:\Apps\AMD\acml-6.1.0\ifort64\include
-#SET _REQUIRED_LIBS=D:\Apps\AMD\acml-6.1.0\ifort64\lib\libacml_dll.lib
-SET _REQUIRED_INCLUDE_PATHS=/ID:\Apps\fftw\include
-SET _REQUIRED_LIBS=D:\Apps\fftw\lib\fftw3.lib
-ECHO Required include paths: %_REQUIRED_INCLUDE_PATHS%
-ECHO Required libraries: %_REQUIRED_LIBS%
-cl /D_USRDLL /D_WINDLL /LD /DBUILDING_GABOR_DLL %_REQUIRED_INCLUDE_PATHS% /Fo:build\gabor.o include\gabor.c %_REQUIRED_LIBS% /link /DLL /IMPLIB:.\lib\libgabor.lib /out:.\lib\libgabor.dll
-endlocal
+IF NOT EXIST build (
+echo Creating build folder ...
+mkdir .\build
 )
+
+IF NOT EXIST lib (
+echo Creating lib folder ...
+mkdir .\lib
+)
+
+SET libname=libgabor.lib
+SET dllname=libgabor.dll
+SET required_include_paths=/ID:\Apps\fftw\include
+SET required_libs=D:\Apps\fftw\lib\fftw3.lib
+SET macros_definitions=/DBUILDING_GABOR_DLL
+SET version=release
+SET install=false
+SET installation_path= 
+
 if "%1" == "python" (
-setlocal EnableDelayedExpansion
-SET REQUIRED_INCLUDE_PATH=/ID:\Apps\fftw\include /ID:\Apps\Anaconda3\include /ID:\Apps\Anaconda3\Lib\site-packages\numpy\core\include
-SET REQUIRED_LIBS=D:\Apps\fftw\lib\fftw3.lib D:\Apps\Anaconda3\libs\python36.lib
-cl /LD  /DBUILDING_PYHTON_MODULE /DNDEBUG !REQUIRED_INCLUDE_PATH! /Fo:build\gabor.o include\gabor.c !REQUIRED_LIBS! /link /DLL /IMPLIB:.\lib\libgabor.lib /out:.\lib\gabor.pyd
-endlocal
-if "%2" == "install" (
-echo Copy module to: %PYTHONPATH%\
-copy .\lib\gabor.pyd %PYTHONPATH%\
+    SET required_include_paths=%required_include_paths% /ID:\Apps\Anaconda3\include /ID:\Apps\Anaconda3\Lib\site-packages\numpy\core\include
+    SET required_libs=%required_libs% D:\Apps\Anaconda3\libs\python36.lib
+    SET macros_definitions=%macros_definitions% /DBUILDING_PYTHON_MODULE
+    SET dllname=gabor.pyd
+    SET installation_path=%PYTHONPATH%
+    if "%2" == "debug" SET version="debug"
+    if "%3" == "install" SET install=true
+) ELSE (
+    if "%1" == "debug" SET version="debug"
+    if "%2" == "install" (
+        SET install=true
+        SET installation_path=%3
+    )
 )
+if "%version%" == "release" SET macros_definitions=%macros_definitions% /DNDEBUG /O2
+
+cl /LD %macros_definitions% %required_include_paths% /Fo:build\gabor.o include\gabor.c %required_libs% /link /DLL /IMPLIB:.\lib\%libname% /out:.\lib\%dllname%
+
+echo %macros_definitions%
+echo %version%
+echo %install%
+echo %installation_path%
+
+if "%install%" == "true" (
+    echo Copy module to: %installation_path%\
+    copy .\lib\%dllname% %installation_path%\
 )
