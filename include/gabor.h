@@ -91,8 +91,8 @@ None
 void generateGaborKernels(ft_complex** gabor_kernels, const unsigned int height, const unsigned int width, const unsigned int par_T, const double par_L, const unsigned int par_K);
 void generateHPF(ft_complex* high_pass_filter, const unsigned int height, const unsigned int width, const unsigned int par_T, const double par_L);
 
-void gaborFilter_impl(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter);
-void gaborFilterWithAngles_impl(ft_complex* input, double* output, double * angles_output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter);
+void gaborFilter_impl(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int t_scales, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter);
+void gaborFilterWithAngles_impl(ft_complex* input, double* output, double * angles_output, const unsigned int height, const unsigned int width, const unsigned int t_scales, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter);
 
 
 void GABOR_DLL singleScaleGaborFilter(double * raw_input, char * mask, double * output, const unsigned int height, const unsigned width, const unsigned int par_T, const double par_L, const unsigned int par_K);

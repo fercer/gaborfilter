@@ -127,7 +127,7 @@ void generateHPF(ft_complex* high_pass_filter, const unsigned int height, const 
 
 
 
-void gaborFilter_impl(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter)
+void gaborFilter_impl(ft_complex* input, double* output, const unsigned int height, const unsigned int width, const unsigned int t_scales, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter)
 {
 	ft_variables(height, width);
 	
@@ -159,16 +159,23 @@ void gaborFilter_impl(ft_complex* input, double* output, const unsigned int heig
 	}
 	ft_close;
 	deallocate_ft_complex(fourier_response_to_kernel);
+		
+	double* o_ptr = output;
+	double* gr_ptr = *gabor_responses_to_kernels;
+		
+	for (unsigned int xy = 0; xy < height*width; xy++, o_ptr+=t_scales, gr_ptr++)
+	{
+		*o_ptr = *gr_ptr;		
+	}
 	
-	memcpy(output, *gabor_responses_to_kernels, height*width*sizeof(double));
 	free(*gabor_responses_to_kernels);
 	
 	for (unsigned int k = 1; k < par_K; k++)
 	{
-		double* o_ptr = output;
-		double* gr_ptr = *(gabor_responses_to_kernels + k);
+		o_ptr = output;
+		gr_ptr = *(gabor_responses_to_kernels + k);
 		
-		for (unsigned int xy = 0; xy < height*width; xy++, o_ptr++, gr_ptr++)
+		for (unsigned int xy = 0; xy < height*width; xy++, o_ptr+=t_scales, gr_ptr++)
 		{
 			if (*o_ptr < *gr_ptr)
 			{
@@ -181,7 +188,7 @@ void gaborFilter_impl(ft_complex* input, double* output, const unsigned int heig
 }
 
 
-void gaborFilterWithAngles_impl(ft_complex* input, double* output, double * angles_output, const unsigned int height, const unsigned int width, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter)
+void gaborFilterWithAngles_impl(ft_complex* input, double* output, double * angles_output, const unsigned int height, const unsigned int width, const unsigned int t_scales, const unsigned int par_K, ft_complex** gabor_kernels, ft_complex* high_pass_filter)
 {
 	ft_variables(height, width);
 	
@@ -214,16 +221,24 @@ void gaborFilterWithAngles_impl(ft_complex* input, double* output, double * angl
 	ft_close;
 	deallocate_ft_complex(fourier_response_to_kernel);
 	
-	memcpy(output, *gabor_responses_to_kernels, height*width*sizeof(double));
+	double* o_ptr = output;
+	double* a_ptr = angles_output;
+	double* gr_ptr = *gabor_responses_to_kernels;
+	
+	for (unsigned int xy = 0; xy < height*width; xy++, o_ptr+=t_scales, a_ptr+=t_scales, gr_ptr++)
+	{
+		*o_ptr = *gr_ptr;
+		*a_ptr = 0;
+	}
 	free(*gabor_responses_to_kernels);
 	
 	for (unsigned int k = 1; k < par_K; k++)
 	{
-		double* o_ptr = output;
-		double* a_ptr = angles_output;
-		double* gr_ptr = *(gabor_responses_to_kernels + k);
+		o_ptr = output;
+		a_ptr = angles_output;
+		gr_ptr = *(gabor_responses_to_kernels + k);
 		
-		for (unsigned int xy = 0; xy < height*width; xy++, o_ptr++, a_ptr++, gr_ptr++)
+		for (unsigned int xy = 0; xy < height*width; xy++, o_ptr+=t_scales, a_ptr+=t_scales, gr_ptr++)
 		{
 			if (*o_ptr < *gr_ptr)
 			{
@@ -260,7 +275,7 @@ void singleScaleGaborFilter(double * raw_input, char * mask, double * output, co
 	generateHPF(high_pass_filter, height, width, par_T, par_L);
 
 	// Apply the single-scale filter:
-	gaborFilter_impl(input, output, height, width, par_K, gabor_kernels, high_pass_filter);
+	gaborFilter_impl(input, output, height, width, 1, par_K, gabor_kernels, high_pass_filter);
 
 	// Apply the mask, the mask(x, y) must be {0, 1}:
 	char * m_ptr = mask;
@@ -308,7 +323,7 @@ void singleScaleGaborFilter_multipleinputs(double * raw_input, const unsigned in
 		ft_release_forward;
 		
 		// Apply the single-scale filter:
-		gaborFilter_impl(input, output + height*width*i, height, width, par_K, gabor_kernels, high_pass_filter);
+		gaborFilter_impl(input, output + height*width*i, height, width, 1, par_K, gabor_kernels, high_pass_filter);
 
 		// Apply the mask, the mask(x, y) must be {0, 1}:
 		char * m_ptr = mask;
@@ -355,12 +370,12 @@ void multiscaleGaborFilter(double * raw_input, char * mask, double * output, con
 		generateHPF(high_pass_filter, height, width, *(par_T+t), par_L);
 
 		// Apply the single-scale filter:
-		gaborFilter_impl(input, output + height*width*t, height, width, par_K, gabor_kernels, high_pass_filter);
+		gaborFilter_impl(input, output + t, height, width, t_scales, par_K, gabor_kernels, high_pass_filter);
 
 		// Apply the mask, the mask(x, y) must be {0, 1}:
 		char * m_ptr = mask;
-		double *o_ptr = output + height*width*t;
-		for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr++)
+		double *o_ptr = output + t;
+		for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr+=t_scales)
 		{
 			*o_ptr = *o_ptr * (double)*m_ptr;
 		}
@@ -410,16 +425,17 @@ void multiscaleGaborFilter_multipleinputs(double * raw_input, const unsigned int
 		for (unsigned int t = 0; t < t_scales; t++)
 		{
 			// Apply the single-scale filter:
-			gaborFilter_impl(input, output + height*width*t + height*width*t_scales*i, height, width, par_K, *(gabor_kernels+t), *(high_pass_filter+t));
+			gaborFilter_impl(input, output + height*width*t_scales*i + t, height, width, t_scales, par_K, *(gabor_kernels+t), *(high_pass_filter+t));
 
 			// Apply the mask, the mask(x, y) must be {0, 1}:
 			char * m_ptr = mask + height*width*i;
-			double *o_ptr = output + height*width*t + height*width*t_scales*i;
+			double *o_ptr = output + t + height*width*t_scales*i;
 			
-			for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr++)
+			for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr+=t_scales)
 			{
 				*o_ptr = *o_ptr * (double)*m_ptr;
 			}
+			
 		}
 	}
 	
@@ -463,7 +479,7 @@ void singleScaleGaborFilterWithAngles(double * raw_input, char * mask, double * 
 	generateHPF(high_pass_filter, height, width, par_T, par_L);
 
 	// Apply the single-scale filter:
-	gaborFilterWithAngles_impl(input, output, angles_output, height, width, par_K, gabor_kernels, high_pass_filter);
+	gaborFilterWithAngles_impl(input, output, angles_output, height, width, 1, par_K, gabor_kernels, high_pass_filter);
 
 	// Apply the mask, the mask(x, y) must be {0, 1}:
 	char * m_ptr = mask;
@@ -514,7 +530,7 @@ void singleScaleGaborFilterWithAngles_multipleinputs(double * raw_input, const u
 		ft_release_forward;
 		
 		// Apply the single-scale filter:
-		gaborFilterWithAngles_impl(input, output + height*width*i, angles_output + height*width*i, height, width, par_K, gabor_kernels, high_pass_filter);
+		gaborFilterWithAngles_impl(input, output + height*width*i, angles_output + height*width*i, height, width, 1, par_K, gabor_kernels, high_pass_filter);
 
 		// Apply the mask, the mask(x, y) must be {0, 1}:
 		char * m_ptr = mask;
@@ -564,14 +580,14 @@ void multiscaleGaborFilterWithAngles(double * raw_input, char * mask, double * o
 		generateHPF(high_pass_filter, height, width, *(par_T+t), par_L);
 
 		// Apply the single-scale filter:
-		gaborFilterWithAngles_impl(input, output + height*width*t, angles_output + height*width*t, height, width, par_K, gabor_kernels, high_pass_filter);
+		gaborFilterWithAngles_impl(input, output, angles_output + height*width*t, height, width, t_scales, par_K, gabor_kernels, high_pass_filter);
 
 		// Apply the mask, the mask(x, y) must be {0, 1}:
 		char * m_ptr = mask;
-		double *o_ptr = output + height*width*t;
-		double *a_ptr = angles_output + height*width*t;
+		double *o_ptr = output + t;
+		double *a_ptr = angles_output + t;
 		
-		for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr++, a_ptr++)
+		for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr+=t_scales, a_ptr+=t_scales)
 		{
 			*o_ptr = *o_ptr * (double)*m_ptr;
 			*a_ptr = *a_ptr * (double)*m_ptr;
@@ -622,13 +638,13 @@ void multiscaleGaborFilterWithAngles_multipleinputs(double * raw_input, const un
 		for (unsigned int t = 0; t < t_scales; t++)
 		{
 			// Apply the single-scale filter:
-			gaborFilterWithAngles_impl(input, output + height*width*t + height*width*t_scales*i, angles_output + height*width*t + height*width*t_scales*i, height, width, par_K, *(gabor_kernels+t), *(high_pass_filter+t));
+			gaborFilterWithAngles_impl(input, output + height*width*t + height*width*t_scales*i, angles_output + height*width*t_scales*i, height, width, t_scales, par_K, *(gabor_kernels+t), *(high_pass_filter+t));
 
 			// Apply the mask, the mask(x, y) must be {0, 1}:
 			char * m_ptr = mask + height*width*i;
-			double *o_ptr = output + height*width*t + height*width*t_scales*i;
-			double *a_ptr = angles_output + height*width*t + height*width*t_scales*i;
-			for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr++, a_ptr++)
+			double *o_ptr = output + t + height*width*t_scales*i;
+			double *a_ptr = angles_output + t + height*width*t_scales*i;
+			for (unsigned int xy = 0; xy < height*width; xy++, m_ptr++, o_ptr+=t_scales, a_ptr+=t_scales)
 			{
 				*o_ptr = *o_ptr * (double)*m_ptr;
 				*a_ptr = *a_ptr * (double)*m_ptr;
@@ -707,7 +723,7 @@ PyObject *gaborFilter(PyObject *self, PyObject *args)
 	PyObject * gabor_response = NULL;
 	if (n_imgs > 1 && par_T_scales > 1)	
 	{
-		npy_intp gabor_response_shape[] = { n_imgs, par_T_scales, height, width };		
+		npy_intp gabor_response_shape[] = { n_imgs, height, width, par_T_scales };		
 		gabor_response = PyArray_SimpleNew(4, &gabor_response_shape[0], NPY_DOUBLE);
 	}
 	else if (n_imgs > 1 && par_T_scales == 1)
@@ -717,7 +733,7 @@ PyObject *gaborFilter(PyObject *self, PyObject *args)
 	}
 	else if (n_imgs == 1 && par_T_scales > 1)
 	{
-		npy_intp gabor_response_shape[] = { par_T_scales, height, width };		
+		npy_intp gabor_response_shape[] = { height, width, par_T_scales };		
 		gabor_response = PyArray_SimpleNew(3, &gabor_response_shape[0], NPY_DOUBLE);
 	}
 	else
@@ -796,7 +812,7 @@ PyObject *gaborFilterWithAngles(PyObject *self, PyObject *args)
 	PyObject * gabor_angles_response = NULL;
 	if (n_imgs > 1 && par_T_scales > 1)	
 	{
-		npy_intp gabor_response_shape[] = { n_imgs, par_T_scales, height, width };
+		npy_intp gabor_response_shape[] = { n_imgs, height, width, par_T_scales };
 		gabor_response = PyArray_SimpleNew(4, &gabor_response_shape[0], NPY_DOUBLE);
 		gabor_angles_response = PyArray_SimpleNew(4, &gabor_response_shape[0], NPY_DOUBLE);
 	}
@@ -808,7 +824,7 @@ PyObject *gaborFilterWithAngles(PyObject *self, PyObject *args)
 	}
 	else if (n_imgs == 1 && par_T_scales > 1)
 	{
-		npy_intp gabor_response_shape[] = { par_T_scales, height, width };		
+		npy_intp gabor_response_shape[] = { height, width, par_T_scales };		
 		gabor_response = PyArray_SimpleNew(3, &gabor_response_shape[0], NPY_DOUBLE);
 		gabor_angles_response = PyArray_SimpleNew(3, &gabor_response_shape[0], NPY_DOUBLE);
 	}
